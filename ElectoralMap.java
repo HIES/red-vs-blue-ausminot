@@ -8,149 +8,216 @@ import java.util.HashMap;
 
 public class ElectoralMap
 {
-    private HashMap<String, Subregion> regions = new HashMap<>();
-    private String[] candidates;
-    
-    private class Subregion
+    private static HashMap<String, HashMap<String, ArrayList<Subregion>>> outer = new HashMap<>();
+
+    public static class Subregion
     {
         private String name;
         private int[] votes;
-        private ArrayList<double[]> xCoords = new ArrayList<>();
-        private ArrayList<double[]> yCoords = new ArrayList<>();
-        private String color;
+        private double[] xCoords;
+        private double[] yCoords;
+        private Color c = StdDraw.WHITE;
+        private double[] minXY;
+        private double[] maxXY;
 
-        public Subregion(String n, int[] v)
+        public Subregion(String n, double[] x, double[] y)
         {
             name = n;
-            votes = v;
-            color = winner();
-        }
-        public String winner()
-        {
-            if (votes[0] > votes[1] && votes[0] > votes[2])
-            {
-                return "RED";
-            }
-            else if (votes[1] > votes[0] && votes[1] > votes[2])
-            {
-                return "BLUE";
-            }
-            else if (votes[2] > votes[0] && votes[2] > votes[1])
-            {
-                return "GREEN";
-            }
-            else
-            {
-                return "WHITE"; //if no voting data
-            }
-        }
-        public void addCoords(double[] xC, double[] yC)
-        {
-            xCoords.add(xC);
-            yCoords.add(yC);
+            xCoords = x;
+            yCoords = y;
         }
         public String getName()
         {
             return name;
         }
-        public String getColor()
+        public Color getColor()
         {
-            return color;
+            return c;
+        }
+        public void changeName(String nN)
+        {
+            name = nN;
+        }
+        public void changeColor(Color nC)
+        {
+            c = nC;
+        }
+        public void changeVote(int[] nV)
+        {
+            votes = nV;
         }
     }
-    
-    public void visualize(String regionName, int year) throws FileNotFoundException
+
+    public static void main(String rN, int y) throws Exception
     {
-        scanVotingData(regionName, year);
-        
-        File fObj = new File("./input/" + regionName + ".txt");
-        Scanner sObj = new Scanner(fObj);
-        
-        double yMin = sObj.nextDouble();
-        double xMin = sObj.nextDouble();
-        double yMax = sObj.nextDouble();
-        double xMax = sObj.nextDouble();
-        double h = xMax - xMin;
-        double w = yMax - yMin;
-        
-        sObj.reset();
-        sObj.nextLine();
-        sObj.nextLine();
-        sObj.nextLine();
-        String curReg;
-        
-        while(sObj.hasNextLine())
+        scanGeoData(rN);
+        scanVotingData(y);
+        visualize(y);
+    }
+    public static void visualize(int y) throws Exception
+    {
+        for (String reg : outer.keySet())
         {
-            curReg = sObj.nextLine();
-            sObj.nextLine();
-            String state = sObj.nextLine();
-            int length = sObj.nextInt();
-            //System.out.println(length);
-            double[] xData = new double[length];
-            double[] yData = new double[length];
-            int ind = 0;
-            
-            while (sObj.hasNextLine() && ind < length)
+            for (String subreg : outer.get(reg).keySet())
             {
-                //String[] temp = sObj.nextLine().split("   ");
-                
-                //System.out.println(temp[0]);
-                xData[ind] = sObj.nextDouble();
-                yData[ind] = sObj.nextDouble();
-                ind++;
+                for (Subregion s : outer.get(reg).get(subreg))
+                {
+                    double[] xSub = s.xCoords;
+                    double[] ySub = s.yCoords;
+                    Color cSub = s.c;
+                    StdDraw.setPenColor(cSub);
+                    StdDraw.filledPolygon(xSub, ySub);
+                }
             }
-            if (regions.get(curReg).getColor().equals("RED"))
+        }
+
+        StdDraw.show();
+    }
+    public static void scanGeoData(String r) throws Exception
+    {
+        StdDraw.enableDoubleBuffering();
+
+        File inputF = new File("./input/" + r + ".txt");
+        Scanner inputObj = new Scanner(inputF);
+
+        double[] minXY = new double[2];
+        double[] maxXY = new double[2];
+        String[] l1 = inputObj.nextLine().split("   ");
+        String[] l2 = inputObj.nextLine().split("   ");
+        int numSubs = Integer.parseInt(inputObj.nextLine());
+        for (int i = 0; i < l1.length; i++)
+        {
+            minXY[i] = Double.parseDouble(l1[i]);
+            maxXY[i] = Double.parseDouble(l2[i]);
+        }
+
+        int c = 0;
+        int length = 0;
+        boolean front = true;
+        double[] xC;
+        double[] yC;
+        int subC = 0;
+        int xH = (int)(maxXY[0]-minXY[0]);
+        int yH = (int)(maxXY[1]-minXY[1]);
+        StdDraw.setCanvasSize(512*(xH/yH), 512);
+        StdDraw.setXscale(minXY[0], maxXY[0]);
+        StdDraw.setYscale(minXY[1], maxXY[1]);
+
+        while (inputObj.hasNextLine() && subC < numSubs)
+        {
+            ArrayList<Subregion> subregs = new ArrayList<>();
+
+            inputObj.nextLine();
+            String subName = inputObj.nextLine();
+            String rName = inputObj.nextLine();
+            length = Integer.parseInt(inputObj.nextLine());
+
+            if(subName.contains("county") || subName.contains("Parish") || subName.contains("city"))
             {
-                StdDraw.setPenColor(StdDraw.RED);
+                int ind = subName.length(); 
+
+                if(subName.indexOf("city") > subName.indexOf("Parish") && subName.indexOf("city") > subName.indexOf("county"))
+                {
+                    ind = subName.indexOf("city");
+                }
+                else if(subName.indexOf("county") > subName.indexOf("Parish") && subName.indexOf("county") > subName.indexOf("city"))
+                {
+                    ind = subName.indexOf("county");
+                }
+                else
+                {
+                    ind = subName.indexOf("Parish");
+                }
+
+                subName = subName.substring(0, ind-1);
             }
-            else if (regions.get(curReg).getColor().equals("BLUE"))
+
+            xC = new double[length];
+            yC = new double[length];
+            c = 0;
+            while (c < length)
             {
-                StdDraw.setPenColor(StdDraw.BLUE);
+                String[] splitCoord = inputObj.nextLine().split("   ");
+                xC[c] = Double.parseDouble(splitCoord[0]);
+                yC[c] = Double.parseDouble(splitCoord[1]);
+
+                c++;
             }
-            else if (regions.get(curReg).getColor().equals("GREEN"))
+
+            subC++;
+            Subregion curReg = new Subregion(subName, xC, yC);
+            Subregion curOuterReg = new Subregion(rName, xC, yC);
+            if (outer.containsKey(rName))
             {
-                StdDraw.setPenColor(StdDraw.GREEN);
+                if (outer.get(rName).containsKey(subName))
+                {
+                    outer.get(rName).get(subName).add(curReg);
+                    outer.get(rName).put(subName, outer.get(rName).get(subName));
+                }
+                else
+                {
+                    ArrayList<Subregion> temp = new ArrayList<>();
+                    temp.add(curReg);
+                    outer.get(rName).put(subName, temp);
+                }
             }
             else
             {
-                StdDraw.setPenColor(StdDraw.WHITE);
+                HashMap<String, ArrayList<Subregion>> inner = new HashMap<>();
+                ArrayList<Subregion> subRegs = new ArrayList<>();
+                subRegs.add(curReg);
+                inner.put(subName, subRegs);
+                outer.put(rName, inner);
             }
-            
-            regions.get(curReg).addCoords(xData, yData);
-            StdDraw.setPenColor(StdDraw.BLACK);
-            StdDraw.polygon(xData, yData);
-            
         }
-        
-        sObj.close();
+
         StdDraw.show();
+        inputObj.close();
     }
-    public void scanVotingData(String rName, int y) throws FileNotFoundException
+    public static void scanVotingData(int y) throws Exception
     {
-        File fileObj = new File("./input/" + rName + y + ".txt");
-        Scanner scanObj = new Scanner(fileObj);
-        
-        String[] firstR = scanObj.nextLine().split(",");
-        candidates = new String[firstR.length-1];
-        
-        for (int i = 1; i < firstR.length; i++)
+        for (String reg : outer.keySet())
         {
-            candidates[i-1] = firstR[i];
-        }
-        
-        while (scanObj.hasNextLine())
-        {
-            String[] line = scanObj.nextLine().split(",");
-            int[] vData = new int[line.length-1];
-            
-            for (int i = 1; i < line.length; i++)
+            int[] rVotes = new int[3];
+            File inputF = new File("./input/" + reg + y + ".txt");
+            Scanner inputObj = new Scanner(inputF);
+            inputObj.nextLine();
+            while (inputObj.hasNextLine())
             {
-                vData[i-1] = Integer.parseInt(line[i]);
+                String[] tempV = inputObj.nextLine().split(",");
+                rVotes[0] = Integer.parseInt(tempV[1]);
+                rVotes[1] = Integer.parseInt(tempV[2]);
+                rVotes[2] = Integer.parseInt(tempV[3]);
+                
+                if (outer.get(reg).containsKey(tempV[0]))
+                {
+                    ArrayList<Subregion> temp = outer.get(reg).get(tempV[0]);
+                    
+                    if(rVotes[0] > rVotes[1] && rVotes[0] > rVotes[2])
+                    {
+                        for(int i = 0; i < temp.size(); i++)
+                        {
+                            temp.get(i).changeColor(StdDraw.RED);
+                        }
+                    }
+                    else if(rVotes[1] > rVotes[0] && rVotes[1] > rVotes[2])
+                    {
+                        for(int i = 0; i < temp.size(); i++)
+                        {
+                            temp.get(i).changeColor(StdDraw.BLUE);
+                        }
+                    }
+                    else
+                    {
+                        for(int i = 0; i < temp.size(); i++)
+                        {
+                            temp.get(i).changeColor(StdDraw.GREEN);
+                        }
+                    }
+                }
             }
             
-            regions.put(line[0], new Subregion(line[0], vData));
+            inputObj.close();
         }
-        
-        scanObj.close();
     }
 }
